@@ -32,7 +32,7 @@ print(f"✅ DATABASE_URL detected: {DATABASE_URL[:30]}... (truncated for securit
 conn = psycopg2.connect(DATABASE_URL)
 cur = conn.cursor()
 
-# ✅ Function to scrape job news from Google News (Fixed Title Extraction)
+# ✅ Function to scrape job news from Google News (Fixes Empty Titles)
 def scrape_job_news(category: str) -> List[Dict[str, str]]:
     url = f"https://news.google.com/search?q={category}+jobs&hl=en&gl=US&ceid=US:en"
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -49,7 +49,10 @@ def scrape_job_news(category: str) -> List[Dict[str, str]]:
 
     job_news = []
     for article in articles:
-        title_tag = article.find("h3") or article.find("a")  # ✅ Improved title extraction
+        print("🔍 Article HTML:", article.prettify())  # ✅ Debugging: Print raw HTML to logs
+
+        # ✅ Extracting title from multiple possible tags
+        title_tag = article.find("h3") or article.find("a") or article.find("span") or article.find("div")
         link_tag = article.find("a")
 
         if title_tag and link_tag and link_tag.has_attr("href"):
