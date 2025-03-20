@@ -6,10 +6,13 @@ from typing import List, Dict
 
 app = FastAPI()
 
-# ✅ Function to scrape job news from Google News
-def scrape_job_news(category: str) -> List[Dict[str, str]]:
-    url = f"https://news.google.com/search?q={category}+jobs&hl=en&gl=US&ceid=US:en"
-    headers = {"User-Agent": "Mozilla/5.0"}
+DATABASE_URL = os.getenv("DATABASE_URL")  # Ensure this is set correctly
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is missing!")
+    
+# Establish database connection
+conn = psycopg2.connect(DATABASE_URL)
+cur = conn.cursor()
 
     try:
         response = requests.get(url, headers=headers, timeout=10)
@@ -34,6 +37,7 @@ def scrape_job_news(category: str) -> List[Dict[str, str]]:
 # ✅ API route to get job news by category
 @app.get("/news/{category}")
 def get_news(category: str):
+<<<<<<< HEAD
     return scrape_job_news(category)
 
 # ✅ Root route to check if the API is running
@@ -44,3 +48,12 @@ def read_root():
 # ✅ Ensures FastAPI keeps running on Render
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=10000)
+=======
+    try:
+        cur.execute("SELECT title, link FROM news WHERE category=%s ORDER BY published_at DESC LIMIT 10", (category,))
+        news = cur.fetchall()
+        return [{"title": row[0], "link": row[1]} for row in news]
+    except psycopg2.Error as e:
+        conn.rollback()  # Reset the transaction to avoid blocking future queries
+        return {"error": str(e)}
+>>>>>>> 3b17c5c (Updated job_news_api)
