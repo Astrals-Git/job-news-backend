@@ -6,10 +6,20 @@ from typing import List, Dict
 
 app = FastAPI()
 
-DATABASE_URL = os.getenv("DATABASE_URL")  # Ensure this is set correctly
+print("✅ Checking environment variables...")  # Debugging output
+
+all_env_vars = os.environ  # Get all environment variables
+for key, value in all_env_vars.items():
+    print(f"{key} = {value}")  # Print each variable to logs
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
 if not DATABASE_URL:
+    print("❌ DATABASE_URL is missing! Check Render environment variables.")
     raise ValueError("DATABASE_URL environment variable is missing!")
-    
+
+print(f"✅ DATABASE_URL detected: {DATABASE_URL[:30]}... (truncated for security)")
+
 # Establish database connection
 conn = psycopg2.connect(DATABASE_URL)
 cur = conn.cursor()
