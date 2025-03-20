@@ -4,11 +4,21 @@ import uvicorn
 import requests
 from bs4 import BeautifulSoup
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict
 
 app = FastAPI()
 
-print("✅ Checking environment variables...")  # Debugging output
+# ✅ Allow requests from your frontend (CORS settings)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # ⬅️ Allows all frontend origins (change to specific domain for security)
+    allow_credentials=True,
+    allow_methods=["*"],  # ⬅️ Allows all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],  # ⬅️ Allows all headers
+)
+
+print("✅ Checking environment variables...")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -51,7 +61,6 @@ def scrape_job_news(category: str) -> List[Dict[str, str]]:
 @app.get("/news/{category}")
 def get_news(category: str):
     try:
-        # ✅ Check if news exists in the database
         cur.execute("SELECT title, link FROM news WHERE category=%s ORDER BY published_at DESC LIMIT 10", (category,))
         news = cur.fetchall()
 
@@ -59,11 +68,9 @@ def get_news(category: str):
             print(f"✅ Found {len(news)} articles in database.")
             return [{"title": row[0], "link": row[1]} for row in news]
 
-        # ❌ No recent data found → Scrape Google News
         print("🔍 No recent data found. Scraping Google News...")
         scraped_news = scrape_job_news(category)
 
-        # ✅ Store scraped news in the database
         for item in scraped_news:
             cur.execute("INSERT INTO news (title, link, category, published_at) VALUES (%s, %s, %s, NOW())",
                         (item["title"], item["link"], category))
@@ -72,7 +79,7 @@ def get_news(category: str):
         return scraped_news
 
     except psycopg2.Error as e:
-        conn.rollback()  # Reset the transaction to avoid blocking future queries
+        conn.rollback()
         return {"error": str(e)}
 
 # ✅ Root route to check if the API is running
