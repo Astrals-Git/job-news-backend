@@ -68,7 +68,7 @@ def scrape_job_news(category: str) -> List[Dict[str, str]]:
 
     job_news = []
     for article in articles:
-        title_tag = article.find("h3") or article.find("div", {"role": "heading"}) or article.find("span") or article.select_one("div.MBeuO").get_text()
+        title_tag = article.find("h3") or article.find("div", {"role": "heading"}) or article.find("span") or article.select_one("div.MBeuO")
         link_tag = article.find("a")
 
         if title_tag and link_tag and link_tag.has_attr("href"):
