@@ -1,21 +1,26 @@
 import os
+import time
 import psycopg2
 import uvicorn
 import requests
 from bs4 import BeautifulSoup
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from typing import List, Dict
 
 app = FastAPI()
 
-# ✅ Enable CORS for frontend requests
+# ✅ Allow frontend requests from Vercel (CORS Fix)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows requests from any frontend
+    allow_origins=["https://job-news-frontend.vercel.app"],  # ✅ Replace with your actual frontend URL
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all HTTP methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["GET", "POST", "OPTIONS"],  # ✅ Allow GET & POST requests
+    allow_headers=["*"],  # ✅ Allow all headers
 )
 
 print("✅ Checking environment variables...")  # Debugging output
@@ -32,35 +37,42 @@ print(f"✅ DATABASE_URL detected: {DATABASE_URL[:30]}... (truncated for securit
 conn = psycopg2.connect(DATABASE_URL)
 cur = conn.cursor()
 
-# ✅ Function to scrape job news from Google News (Fixes Empty Titles)
+# ✅ Function to set up Selenium with ChromeDriver
+def setup_selenium():
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # Run in headless mode
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    
+    # Use webdriver_manager to automatically download ChromeDriver
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+    
+    return driver
+
+# ✅ Function to scrape job news using Selenium & BeautifulSoup
 def scrape_job_news(category: str) -> List[Dict[str, str]]:
     url = f"https://news.google.com/search?q={category}+jobs&hl=en&gl=US&ceid=US:en"
-    headers = {"User-Agent": "Mozilla/5.0"}
 
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Error fetching news: {e}")
-        return []
+    # ✅ Start Selenium WebDriver
+    driver = setup_selenium()
+    driver.get(url)
+    time.sleep(5)  # ✅ Wait for JavaScript to load
 
-    soup = BeautifulSoup(response.text, "html.parser")
+    # ✅ Get fully rendered page source
+    page_source = driver.page_source
+    driver.quit()  # ✅ Close browser after loading page
 
-    # ✅ Debugging: Print only the first 500 characters of the HTML (Prevent log overflow)
-    print(f"🔍 HTML Preview: {soup.prettify()[:500]}...")  
-
-    articles = soup.find_all("article")[:10]
+    soup = BeautifulSoup(page_source, "html.parser")
+    articles = soup.find_all("article")[:10]  # Get top 10 job-related articles
 
     job_news = []
     for article in articles:
-        print("🔍 Article HTML Preview:", article.prettify()[:200])  # ✅ Prevent log overflow
-
-        # ✅ Extracting title from multiple possible tags
-        title_tag = article.find("h3") or article.find("a") or article.find("span") or article.find("div")
+        title_tag = article.find("h3") or article.find("div", {"role": "heading"}) or article.find("span")
         link_tag = article.find("a")
 
         if title_tag and link_tag and link_tag.has_attr("href"):
-            title = title_tag.get_text(strip=True)  
+            title = title_tag.get_text(strip=True)
             link = "https://news.google.com" + link_tag["href"][1:]
             job_news.append({"title": title, "link": link})
 
