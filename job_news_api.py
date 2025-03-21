@@ -46,22 +46,22 @@ def scrape_job_news(category: str) -> List[Dict[str, str]]:
 
     soup = BeautifulSoup(response.text, "html.parser")
 
-    # ✅ Debugging: Print full HTML response
-    print("🔍 Full HTML response from Google News:")
-    print(soup.prettify())  # This will show what the scraper actually sees
+    # ✅ Debugging: Print only the first 500 characters of the HTML (Prevent log overflow)
+    print(f"🔍 HTML Preview: {soup.prettify()[:500]}...")  
 
     articles = soup.find_all("article")[:10]
 
     job_news = []
     for article in articles:
-        print("🔍 Article HTML:", article.prettify())  # ✅ Debugging: Print each article block
+        print("🔍 Article HTML Preview:", article.prettify()[:200])  # ✅ Prevent log overflow
 
+        # ✅ Extracting title from multiple possible tags
         title_tag = article.find("h3") or article.find("a") or article.find("span") or article.find("div")
         link_tag = article.find("a")
 
         if title_tag and link_tag and link_tag.has_attr("href"):
-            title = title_tag.get_text(strip=True)  # ✅ Extract text properly
-            link = "https://news.google.com" + link_tag["href"][1:]  # ✅ Fix link format
+            title = title_tag.get_text(strip=True)  
+            link = "https://news.google.com" + link_tag["href"][1:]
             job_news.append({"title": title, "link": link})
 
     print(f"✅ Scraped {len(job_news)} job news articles.")
