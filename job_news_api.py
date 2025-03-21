@@ -68,11 +68,11 @@ def scrape_job_news(category: str) -> List[Dict[str, str]]:
 
     job_news = []
     for article in articles:
-        title_tag = article.find("h3") or article.find("div", {"role": "heading"}) or article.find("span") or article.select_one("div.MBeuO")
+        title_tag = article.select_one("div.MBeuO")  # ✅ Extracting title using CSS selector
         link_tag = article.find("a")
 
         if title_tag and link_tag and link_tag.has_attr("href"):
-            title = title_tag.get_text(strip=True)
+            title = title_tag.get_text(strip=True)  
             link = "https://news.google.com" + link_tag["href"][1:]
             job_news.append({"title": title, "link": link})
 
