@@ -81,7 +81,10 @@ def scrape_job_news(category: str) -> List[Dict[str, str]]:
 
     job_news = []
     for article in articles:
-        title_tag = article.select_one("h3") or article.select_one("a") or article.select_one("span")
+        title_tag = (article.select_one("h3") or 
+                     article.select_one("a") or 
+                     article.select_one("div[role='heading']") or 
+                     article.select_one("span"))
         link_tag = article.find("a", href=True)
 
         if not title_tag or not link_tag:
@@ -95,7 +98,15 @@ def scrape_job_news(category: str) -> List[Dict[str, str]]:
     print(f"✅ Scraped {len(job_news)} job news articles.")
     return job_news
 
-# ✅ API route to get job news by category
+# ✅ Route to handle `/news` (Prevents 404 Error)
+@app.get("/news")
+def get_all_news():
+    return {
+        "message": "Please use /news/{category} to fetch job news.",
+        "example": "/news/software"
+    }
+
+# ✅ Route to get job news by category
 @app.get("/news/{category}")
 def get_news(category: str):
     try:
