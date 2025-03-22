@@ -13,10 +13,10 @@ from typing import List, Dict
 
 app = FastAPI()
 
-# ✅ CORS Configuration
+# ✅ TEMPORARY CORS FIX (Allow All Requests for Debugging)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://job-news-frontend.vercel.app"],  # ✅ Replace with your actual frontend URL
+    allow_origins=["*"],  # ❌ Replace this with your frontend URL after debugging
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
@@ -74,11 +74,14 @@ def scrape_job_news(category: str) -> List[Dict[str, str]]:
 
     if articles:
         print("🔍 Debug: Full HTML of First Article:")
-        print(articles[0].prettify())  # ✅ Print first article's full HTML for debugging
+        print(articles[0].prettify())  # ✅ Force printing first article's full HTML
+    else:
+        print("❌ No articles found! Debugging Full Page HTML...")
+        print(soup.prettify())  # ✅ Print full page source if no articles are found
 
     job_news = []
     for article in articles:
-        title_tag = article.select_one("h3") or article.select_one("a") or article.select_one("span")  # ✅ Extract title from multiple elements
+        title_tag = article.select_one("h3") or article.select_one("a") or article.select_one("span")
         link_tag = article.find("a", href=True)
 
         if not title_tag or not link_tag:
