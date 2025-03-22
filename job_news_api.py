@@ -2,6 +2,7 @@ import os
 import time
 import psycopg2
 import uvicorn
+import feedparser  # ✅ Added for Google RSS Feeds
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from selenium import webdriver
@@ -9,7 +10,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
-from typing import List, Dict
+from typing import List, Dict, Set
 
 app = FastAPI()
 
@@ -74,17 +75,12 @@ def scrape_job_news(category: str) -> List[Dict[str, str]]:
 
     if articles:
         print("🔍 Debug: Full HTML of First Article:")
-        print(articles[0].prettify())  # ✅ Force printing first article's full HTML
-    else:
-        print("❌ No articles found! Debugging Full Page HTML...")
-        print(soup.prettify())  # ✅ Print full page source if no articles are found
+        print(articles[0].prettify())  # ✅ Print first article's full HTML
 
     job_news = []
     for article in articles:
-        title_tag = (article.select_one("h3") or 
-                     article.select_one("a") or 
-                     article.select_one("div[role='heading']") or 
-                     article.select_one("span"))
+        # ✅ Extract title from first <h1> inside each article (ignoring class names)
+        title_tag = article.find("h1")
         link_tag = article.find("a", href=True)
 
         if not title_tag or not link_tag:
@@ -97,6 +93,33 @@ def scrape_job_news(category: str) -> List[Dict[str, str]]:
 
     print(f"✅ Scraped {len(job_news)} job news articles.")
     return job_news
+
+# ✅ Function to fetch job news from Google RSS Feeds
+def fetch_rss_news(category: str) -> List[Dict[str, str]]:
+    rss_url = f"https://news.google.com/rss/search?q={category}+jobs"
+    feed = feedparser.parse(rss_url)
+
+    rss_news = []
+    for entry in feed.entries[:10]:  # ✅ Limit to 10 news articles
+        title = entry.title
+        link = entry.link
+        rss_news.append({"title": title, "link": link})
+
+    print(f"✅ Fetched {len(rss_news)} articles from Google RSS.")
+    return rss_news
+
+# ✅ Function to merge & de-duplicate news from RSS & Web Scraping
+def merge_news(scraped_news: List[Dict[str, str]], rss_news: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    unique_titles: Set[str] = set()
+    merged_news = []
+
+    for news_item in scraped_news + rss_news:  # ✅ Merge both sources
+        if news_item["title"] not in unique_titles:
+            unique_titles.add(news_item["title"])
+            merged_news.append(news_item)
+
+    print(f"✅ Merged news count after de-duplication: {len(merged_news)}")
+    return merged_news
 
 # ✅ Route to handle `/news` (Prevents 404 Error)
 @app.get("/news")
@@ -121,17 +144,21 @@ def get_news(category: str):
             print(f"✅ Found {len(news)} articles in database.")
             return [{"title": row[0], "link": row[1]} for row in news]
 
-        # ❌ No recent data found → Scrape Google News
-        print(f"🔍 No recent data found for {category}. Scraping Google News...")
+        # ❌ No recent data found → Scrape Google News & Fetch RSS
+        print(f"🔍 No recent data found for {category}. Fetching RSS & Scraping Google News...")
         scraped_news = scrape_job_news(category)
+        rss_news = fetch_rss_news(category)
 
-        # ✅ Store scraped news in the database
-        for item in scraped_news:
+        # ✅ Merge & remove duplicate articles
+        final_news = merge_news(scraped_news, rss_news)
+
+        # ✅ Store final news in the database
+        for item in final_news:
             cur.execute("INSERT INTO news (title, link, category, published_at) VALUES (%s, %s, %s, NOW())",
                         (item["title"], item["link"], category))
         conn.commit()
 
-        return scraped_news
+        return final_news
 
     except psycopg2.Error as e:
         if conn:
